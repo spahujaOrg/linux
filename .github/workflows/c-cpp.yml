@@ -1,22 +1,93 @@
-name: C/C++ CI
+name: Linux Kernel Build
 
 on:
-    push:
-      branches: [ "master" ]
-    pull_request:
-      branches: [ "master" ]
-    workflow_dispatch:  # Enables manual trigger
+  workflow_dispatch:
 
-  jobs:
-    build:
-      runs-on: [runs-on, env:dev]
-      steps:
+jobs:
+  build:
+    runs-on: [runs-on, env:dev]
+
+    steps:
       - uses: actions/checkout@v4
-      - name: configure
-        run: ./configure
-      - name: make
-        run: make
-      - name: make check
-        run: make check
-      - name: make distcheck
-        run: make distcheck
+
+      # ==============================
+      # Machine Specification Section
+      # ==============================
+
+      - name: Show basic runner info
+        run: |
+          echo "Runner OS: $RUNNER_OS"
+          echo "Runner Name: $RUNNER_NAME"
+          echo "Runner Arch: $RUNNER_ARCH"
+          echo "Image OS: $ImageOS"
+          echo "Image Version: $ImageVersion"
+
+      - name: CPU Information
+        run: |
+          echo "===== CPU INFO ====="
+          lscpu
+          echo ""
+          echo "CPU cores: $(nproc)"
+          echo ""
+          echo "Model name:"
+          grep "model name" /proc/cpuinfo | head -1
+
+      - name: Memory Information
+        run: |
+          echo "===== MEMORY INFO ====="
+          free -h
+          echo ""
+          echo "Total Memory:"
+          grep MemTotal /proc/meminfo
+
+      - name: Disk Information
+        run: |
+          echo "===== DISK INFO ====="
+          df -h
+          echo ""
+          echo "Block Devices:"
+          lsblk
+
+      - name: OS Information
+        run: |
+          echo "===== OS INFO ====="
+          uname -a
+          echo ""
+          cat /etc/os-release
+
+      - name: Try to Detect Vendor (VM Host)
+        run: |
+          echo "===== SYSTEM MANUFACTURER ====="
+          sudo dmidecode -s system-manufacturer || echo "Not permitted"
+          echo ""
+          echo "===== SYSTEM PRODUCT NAME ====="
+          sudo dmidecode -s system-product-name || echo "Not permitted"
+
+      # ==============================
+      # Install build dependencies
+      # ==============================
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            bc \
+            bison \
+            flex \
+            libssl-dev \
+            libelf-dev \
+            dwarves
+
+      # ==============================
+      # Kernel build
+      # ==============================
+
+      - name: Configure kernel (default config)
+        run: make defconfig
+
+      - name: Build kernel
+        run: make -j$(nproc)
+
+      - name: Show built artifacts
+        run: ls -lh arch/x86/boot/
